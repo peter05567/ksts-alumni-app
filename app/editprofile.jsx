@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons'
-import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
@@ -68,43 +67,6 @@ export default function EditProfileScreen() {
     setFormData(prev => ({ ...prev, [key]: value }))
   }
 
-  const pickImage = async () => {
-    try {
-      // Request permissions
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      
-      if (permissionResult.granted === false) {
-        Alert.alert("Permission Required", "You need to grant camera roll permissions to change your profile photo.")
-        return
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5, // Lower quality to keep base64 string smaller
-        base64: true, // Request base64
-      })
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedImage = result.assets[0]
-        // Create data URI
-        const imageUri = `data:${selectedImage.mimeType || 'image/jpeg'};base64,${selectedImage.base64}`
-        
-        // Check size roughly (Firestore document limit is 1MB)
-        if (imageUri.length > 1000000) { 
-           Alert.alert("Image Too Large", "Please choose a smaller image or compress it.")
-           return
-        }
-        
-        setFormData(prev => ({ ...prev, image: imageUri }))
-      }
-    } catch (error) {
-      console.error("Error picking image: ", error)
-      Alert.alert("Error", "Failed to pick image")
-    }
-  }
-
   const handleSave = async () => {
     if (!formData.username || !formData.email) {
       Alert.alert("Error", "Username and Email are required")
@@ -164,6 +126,9 @@ export default function EditProfileScreen() {
       <CustomHeader 
         title="Edit Profile" 
         onLeftPress={() => router.back()} 
+        // We can pass a prop to CustomHeader to change the icon if we updated it, 
+        // but for now relying on default or modifying CustomHeader later.
+        // Assuming CustomHeader uses the logo which acts as back/home in this context or we can modify CustomHeader.
       />
       
       <KeyboardAvoidingView 
@@ -176,7 +141,7 @@ export default function EditProfileScreen() {
           <View style={styles.imageSection}>
             <View style={styles.imageContainer}>
               <Image source={{ uri: formData.image }} style={styles.profileImage} />
-              <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
+              <TouchableOpacity style={styles.cameraButton} onPress={() => Alert.alert("Coming Soon", "Image upload functionality will be added soon.")}>
                 <Ionicons name="camera" size={20} color="#000" />
               </TouchableOpacity>
             </View>

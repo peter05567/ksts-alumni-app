@@ -1,39 +1,12 @@
 import CustomHeader from '@/components/CustomHeader'
-import React from 'react'
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
+import React, { useEffect, useState } from 'react'
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { auth, db } from '../../services/firebase'
 
-// Dummy Data matching the image
-const NEWS_DATA = [
-  {
-    id: '1',
-    category: 'Finance',
-    title: 'Alumni Scholarship Fund Reaches Record High for 2024',
-    description: 'Thanks to the generous contributions of alumni, the KSTS Scholarship Fund has surpassed its target, providing financial aid...',
-    author: 'Finance Committee',
-    date: 'December 01, 2023',
-    image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80', // Graduation/Scholarship related
-  },
-  {
-    id: '2',
-    category: 'Sports',
-    title: 'KSTS Annual Sports Day: A Day of Athletic Prowess',
-    description: 'The KSTS community celebrated its annual sports day with enthusiastic participation from students and faculty. Records were...',
-    author: 'Sports Department',
-    date: 'September 18, 2023',
-    image: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80', // Sports related
-  },
-  {
-    id: '3',
-    category: 'Academics',
-    title: 'New Science Laboratory Inaugurated by the Vice Chancellor',
-    description: 'State-of-the-art facilities added to the science department to enhance practical learning experiences for all students.',
-    author: 'Admin Office',
-    date: 'August 15, 2023',
-    image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80', // Science lab related
-  },
-]
-
-const NewsCard = ({ item }) => (
+const NewsCard = ({ item, onDelete }) => (
   <View style={styles.card}>
     {/* Image Section */}
     <View style={styles.imageContainer}>
@@ -41,19 +14,31 @@ const NewsCard = ({ item }) => (
       <View style={styles.categoryBadge}>
         <Text style={styles.categoryText}>{item.category}</Text>
       </View>
+      {auth.currentUser?.uid === item.authorId && (
+        <TouchableOpacity 
+          style={styles.deleteButton} 
+          onPress={() => onDelete(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
 
     {/* Content Section */}
     <View style={styles.cardContent}>
       <Text style={styles.cardTitle}>{item.title}</Text>
-      <Text style={styles.cardDescription}>{item.description}</Text>
+      <Text style={styles.cardDescription} numberOfLines={2} ellipsizeMode="tail">
+        {item.description}
+      </Text>
       
       <View style={styles.metaContainer}>
-        <Text style={styles.metaText}>{item.author}</Text>
-        <Text style={styles.metaText}>{item.date}</Text>
+        <Text style={styles.metaText}>{item.author || 'Admin'}</Text>
+        <Text style={styles.metaText}>
+          {item.date || (item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Recent')}
+        </Text>
       </View>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push(`/readmorenews?id=${item.id}`)}>
         <Text style={styles.readMore}>Read More</Text>
       </TouchableOpacity>
     </View>
@@ -61,24 +46,72 @@ const NewsCard = ({ item }) => (
 )
 
 export default function index() {
+  const [news, setNews] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const q = query(collection(db, 'news'), orderBy('createdAt', 'desc'))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setNews(newsData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleDelete = (id) => {
+    Alert.alert(
+      "Delete News",
+      "Are you sure you want to delete this news item?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, 'news', id))
+            } catch (error) {
+              console.error("Error deleting news:", error)
+              Alert.alert("Error", "Failed to delete news")
+            }
+          }
+        }
+      ]
+    )
+  }
+
   return (
     <View style={styles.container}>
       <CustomHeader 
         rightIcon1='notifications-outline'
-        rightIcon2='person-circle-outline'
+        rightIcon2='add-circle-outline'
         title="KSTS KNUST" 
         onLeftPress={() => console.log('Menu')} 
         onRightPress1={() => console.log('Notif')} 
-        onRightPress2={() => console.log('Profile')} 
+        onRightPress2={() => router.push('/addnews')} 
       />
       
-      <FlatList
-        data={NEWS_DATA}
-        renderItem={({ item }) => <NewsCard item={item} />}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFD700" />
+        </View>
+      ) : (
+        <FlatList
+          data={news}
+          renderItem={({ item }) => <NewsCard item={item} onDelete={handleDelete} />}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No news available yet.</Text>
+          }
+        />
+      )}
     </View>
   )
 }
@@ -132,33 +165,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   cardContent: {
-    padding: 16,
+    padding: 20,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
-    lineHeight: 24,
+    lineHeight: 28,
   },
   cardDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   metaContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingBottom: 12,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   readMore: {
     color: '#FFD700', // Yellow link
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    alignSelf: 'flex-start',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  emptyText: {
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+    opacity: 0.6,
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 0, 0, 0.7)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 })

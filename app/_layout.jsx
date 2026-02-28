@@ -41,7 +41,11 @@ export default function RootLayout() {
         <Stack.Screen name="patrons" options={{ presentation: 'modal',headerShown: false }} />
         <Stack.Screen name="individualchat/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="groupchats/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="addnews" options={{ presentation: 'modal',headerShown: false }} />
+        <Stack.Screen name="readmorenews" options={{ headerShown: false }} />
         <Stack.Screen name="group-info/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="groupchats/create" options={{ headerShown: false }} />
+        <Stack.Screen name="collegedetail" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
